@@ -8,6 +8,8 @@ const int BOTTOM_STOP = 2;
 
 const int NUM_READINGS = 5;
 
+const int PULSE_DELAY = 5000;
+
 int spead = 255;
 int del = 1000;
 
@@ -30,6 +32,8 @@ void setup()
   
   Serial.begin(115200);
   Serial.println("lets begin");
+  
+  zHeight = getHeight();
 }
 
 void topStop() {
@@ -52,33 +56,49 @@ void bottomStopDone() {
   attachInterrupt(0, bottomStop, LOW);
 }
  
-void up()
+void up(int cm)
 {
-  Serial.println("up");
-  analogWrite(PWMA,255);
-  digitalWrite(DIRA,LOW);//turn DC Motor A move anticlockwise
+  
+  if(isDown)
+    return;
+  int start = zHeight;
+  Serial.print("starting at: ");
+  Serial.println(start);
+  while( true ){
+    int cur = getHeight();
+    if( cur - start >= cm ){
+      zHeight = cur;
+      break;
+    }
+    analogWrite(PWMA,255);
+    digitalWrite(DIRA,LOW);
+    delayMicroseconds(PULSE_DELAY);
+    halt();
+  }
+  Serial.print("end up height: ");
+  Serial.println(zHeight);
 }
-void down()//
+
+void down(int cm)
 {
   if(isDown)
     return;
   int start = zHeight;
+  Serial.print("starting at: ");
   Serial.println(start);
   while( true ){
     int cur = getHeight();
-    if( start - cur >= 1 ){
+    if( start - cur >= cm ){
       zHeight = cur;
       break;
     }
-    analogWrite(PWMA,90);
+    analogWrite(PWMA,100);
     digitalWrite(DIRA,HIGH);
-    delayMicroseconds(1500);
+    delayMicroseconds(PULSE_DELAY);
     halt();
   }
-  Serial.println("1 cm");
+  Serial.print("end down height: ");
   Serial.println(zHeight);
-//  analogWrite(PWMA,80);
-//  digitalWrite(DIRA,HIGH);
 }
 
 void halt()//
@@ -95,7 +115,7 @@ int getHeight() {
     delay(5);
   }
   readings = readings/NUM_READINGS;
-  Serial.println(readings);
+//  Serial.println(readings);
   return round(readings);
 }  
 int doReading() {
@@ -141,21 +161,42 @@ long microsecondsToCentimeters(long microseconds)
   return microseconds / 29 / 2;
 }
 
+void waitForInput() {
+  Serial.flush();
+  while( Serial.available() < 1 ){
+//    Serial.print(".");
+    delay(1);
+  }
+}
 void loop(){
+  Serial.println("up (u) or down (d) or height (h) ?");
+  waitForInput();
   char input = Serial.read();
+  while( Serial.available() > 0 )
+     Serial.read();
   switch(input) {
-    case 'f':
-      up();
+    case 'u':
+      Serial.println("How many cm?");
+      waitForInput();
+      up(Serial.parseInt());
       delay(500);
       halt();
       break;  
-    case 'b':
-      down();
+    case 'd':
+      Serial.println("How many cm?");
+      waitForInput();
+      down(Serial.parseInt());
       delay(500);
       halt();
       break;
     case 'h':
-      Serial.println(getHeight());
+      Serial.print("Platform at: ");
+      Serial.print(getHeight());
+      Serial.println(" cm");
+      break;
+    default:
+      Serial.print(input);
+      Serial.println("is an unnkown input... try again.");
       break;
   }
   delay(250);
