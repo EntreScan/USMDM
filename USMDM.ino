@@ -1,18 +1,25 @@
-const int trigger = 6;
-const int echo = 5;
+const int TRIGGER = 5;
+const int ECHO = 4;
 
 const int DIRA=13;
 const int PWMA=11;
 
 const int BOTTOM_STOP = 2;
 
+const int NUM_READINGS = 5;
+
 int spead = 255;
 int del = 1000;
+
+int zHeight = 0;
 
 volatile boolean isDown = false;
 
 void setup()
 {
+  pinMode(TRIGGER, OUTPUT);
+  pinMode(ECHO, INPUT);
+  
   pinMode(BOTTOM_STOP, INPUT);
   digitalWrite(BOTTOM_STOP, LOW);
   attachInterrupt(0, bottomStop, LOW);
@@ -55,9 +62,23 @@ void down()//
 {
   if(isDown)
     return;
-  Serial.println("down");
-  analogWrite(PWMA,80);//turn DC Motor A move clockwise
-  digitalWrite(DIRA,HIGH);
+  int start = zHeight;
+  Serial.println(start);
+  while( true ){
+    int cur = getHeight();
+    if( start - cur >= 1 ){
+      zHeight = cur;
+      break;
+    }
+    analogWrite(PWMA,90);
+    digitalWrite(DIRA,HIGH);
+    delayMicroseconds(1500);
+    halt();
+  }
+  Serial.println("1 cm");
+  Serial.println(zHeight);
+//  analogWrite(PWMA,80);
+//  digitalWrite(DIRA,HIGH);
 }
 
 void halt()//
@@ -67,44 +88,39 @@ void halt()//
   digitalWrite(PWMA,LOW);
 }
 
-boolean shouldStop() {
-  
-  int cm = getDistance();
-  delay(25);
-  cm += getDistance();
-  delay(25);
-  cm += getDistance();
-  delay(25);
-  
-  cm /= 3;
-  
-//  Serial.print(cm);
-//  Serial.println();
-  
-  if( cm < 14 )
-    return true;
-  else
-    return false;
-}
-
-int getDistance() {
-    // establish variables for duration of the ping, 
+int getHeight() {
+  float readings = 0;
+  for( int i = 0; i < NUM_READINGS; i++ ){
+    readings += doReading();
+    delay(5);
+  }
+  readings = readings/NUM_READINGS;
+  Serial.println(readings);
+  return round(readings);
+}  
+int doReading() {
+  // establish variables for duration of the ping, 
   // and the distance result in inches and centimeters:
-  long duration, inches;
-  
+  long duration, inches, cm;
+
   // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
   // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
-  digitalWrite(trigger, LOW);
+//  pinMode(TRIGGER, OUTPUT);
+  digitalWrite(TRIGGER, LOW);
   delayMicroseconds(2);
-  digitalWrite(trigger, HIGH);
+  digitalWrite(TRIGGER, HIGH);
   delayMicroseconds(5);
-  digitalWrite(trigger, LOW);
+  digitalWrite(TRIGGER, LOW);
+
   // The same pin is used to read the signal from the PING))): a HIGH
   // pulse whose duration is the time (in microseconds) from the sending
   // of the ping to the reception of its echo off of an object.
-  duration = pulseIn(echo, HIGH);
+//  pinMode(ECHO, INPUT);
+  duration = pulseIn(ECHO, HIGH);
+
+  // convert the time into a distance
+  //inches = microsecondsToInches(duration);
   return microsecondsToCentimeters(duration);
-  
 }
 
 long microsecondsToInches(long microseconds)
@@ -138,6 +154,9 @@ void loop(){
       delay(500);
       halt();
       break;
+    case 'h':
+      Serial.println(getHeight());
+      break;
   }
-  delay(50);
+  delay(250);
 }
